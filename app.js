@@ -1,61 +1,53 @@
-/* -----------------------------------------------
-/* Author : Titanium Network
-/* MIT license: http://opensource.org/licenses/MIT
-/* ----------------------------------------------- */
+const express = require('express');
+const alloy = require('alloyproxy');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const compression = require('compression');
+const cors = require('cors');
 
-const express = require('express'),
-    alloy = require('alloyproxy'),
-    app = express(),
-    http = require('http'),
-    fs = require('fs'),
-    path = require('path');
-
-const config = JSON.parse(fs.readFileSync('./config.json', {
-    encoding: 'utf8'
-}));
-
+const config = JSON.parse(fs.readFileSync('./config.json', { encoding: 'utf8' }));
+const app = express();
 const server = http.createServer(app);
 
-//Local Alloy Proxy
+// Middleware
+app.use(compression());
+app.use(cors());
 
+// Proxy configuration
 const localprox = new alloy({
     prefix: '/prefix/',
     error: (proxy) => {
+        console.error(`Error: ${proxy.error}`);
         return proxy.res.send(fs.readFileSync(path.join(__dirname, 'public', 'error.html'), 'utf8'));
     },
-    request: [],
-    response: [],
+    request: (proxy) => {
+        if (proxy.req.headers.cookie) {
+            proxy.headers['Cookie'] = proxy.req.headers.cookie;
+        }
+    },
+    response: (proxy) => {
+        if (proxy.res.headers['set-cookie']) {
+            proxy.res.headers['set-cookie'].forEach(cookie => {
+                proxy.res.cookie(cookie.split(';')[0].split('=')[0], cookie.split(';')[0].split('=')[1], { path: '/' });
+            });
+        }
+    },
     injection: true
 });
 
 app.use(localprox.app);
-
 localprox.ws(server);
 
-//Cloudflare Attack Mode Fix
-
-app.post('/', async (req, res) => {
-    switch (req.url) {
-        case '/':
-            return res.send(fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8'));
-    }
-});
-
-//Querystring Navigation
-app.get('/', async (req, res) => {
-
-    switch (req.url) {
-        case '/':
-            return res.send(fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8'));
-    }
-
-    switch (req.url) {
-        case '/?a':
-            return res.send(fs.readFileSync(path.join(__dirname, 'public', 'error.html'), 'utf8'));
-    }
-
-});
-
+// Static file handling
 app.use(express.static(path.join(__dirname, 'public')));
 
-server.listen(process.env.PORT || config.port);
+// Root route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Start the server
+server.listen(process.env.PORT || config.port, () => {
+    console.log(`Server running on port ${process.env.PORT || config.port}`);
+});
