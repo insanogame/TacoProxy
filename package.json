@@ -22,7 +22,7 @@
     "dependencies": {
         "alloyproxy": "^1.0.0",
         "cookie-parser": "^1.4.5",
-        "compression": "^1.7.4",  // Agregado aquí
+        "compression": "^1.7.4",
         "express": "^4.17.1",
         "express-session": "^1.17.1",
         "mime-types": "^2.1.27",
